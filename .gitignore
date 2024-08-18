@@ -1,0 +1,15 @@
+*.spec
+*.png
+*.ico
+v1.py
+v2.py
+v4.py
+test.py
+/build/
+/dist/
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.log
+*.db
