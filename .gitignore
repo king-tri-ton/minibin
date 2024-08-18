@@ -3,6 +3,7 @@
 *.ico
 v1.py
 v2.py
+v3.py
 v4.py
 test.py
 /build/
