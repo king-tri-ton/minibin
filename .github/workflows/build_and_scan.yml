@@ -39,8 +39,8 @@ jobs:
         name: built-exe
         path: dist/MiniBin-KT.exe
 
-    - name: Scan with VirusTotal
-      uses: fabasoad/virustotal-api-action@v1.1.3
+    - name: VirusTotal GitHub Action
+      uses: crazy-max/ghaction-virustotal@v4.0.0
       with:
         api_key: ${{ secrets.VIRUSTOTAL_API_KEY }}
         file: dist/MiniBin-KT.exe
