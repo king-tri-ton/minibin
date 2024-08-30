@@ -1,6 +1,6 @@
 # Minibin - Утилита для Очистки Корзины в Windows 10
 
-![Minibin Logo](https://github.com/user-attachments/assets/9fea8f83-d26a-4f45-86d4-60439d7ce4aa)
+![MiniBin Logo](https://github.com/user-attachments/assets/f8a610dc-4592-4a3e-bc92-3d835cd8c565)
 
 ## Введение
 
