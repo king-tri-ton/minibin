@@ -1,10 +1,12 @@
-# v4
 import ctypes
 import threading
 import pystray
 from pystray import MenuItem as item, Menu as menu
-from PIL import Image, ImageDraw
+from PIL import Image
 import time
+import os
+import sys
+from plyer import notification
 
 class SHQUERYRBINFO(ctypes.Structure):
     _fields_ = [
@@ -13,21 +15,28 @@ class SHQUERYRBINFO(ctypes.Structure):
         ("i64NumItems", ctypes.c_int64)
     ]
 
-def create_image(empty):
-    # Создаем изображение с прозрачным фоном
-    image = Image.new('RGBA', (32, 64), color=(0, 0, 0, 0))
-    dc = ImageDraw.Draw(image)
+def resource_path(relative_path):
+    """ Получает путь к ресурсам, поддерживает работу с PyInstaller. """
+    try:
+        # Путь к ресурсу в режиме сборки
+        base_path = sys._MEIPASS
+    except AttributeError:
+        # Путь к ресурсу в режиме разработки
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
-    # Цвет заливки
-    fill_color = (255, 255, 255, 255) if empty else (173, 216, 230, 255)  # Белый для пустой корзины, светло-голубой для заполненной
-    
-    # Рисуем заливку с прозрачными границами
-    dc.rectangle([10, 10, 31, 63], fill=fill_color, outline=(0, 0, 0, 0), width=0)  # Прозрачные границы
+def load_icon(icon_path):
+    return Image.open(resource_path(icon_path))
 
-    return image
+def show_notification(title, message, icon_path=None):
+    notification.notify(
+        title=title,
+        message=message,
+        app_icon=icon_path,  # Можно оставить пустым или указать путь к иконке
+        timeout=1  # Время отображения уведомления
+    )
 
 def empty_recycle_bin(icon, item):
-    # Функция для очистки корзины
     SHEmptyRecycleBin = ctypes.windll.shell32.SHEmptyRecycleBinW
     flags = 0x01  # SHERB_NOCONFIRMATION
     bin_path = ctypes.create_unicode_buffer(260)
@@ -35,47 +44,43 @@ def empty_recycle_bin(icon, item):
     result = SHEmptyRecycleBin(None, bin_path, flags)
 
     if result == 0 or result == -2147418113:
-        print("Корзина успешно очищена.")
+        show_notification("Корзина", "Корзина успешно очищена.", resource_path("icons/minibin-kt-empty.ico"))
         update_icon()
     else:
-        print("Произошла ошибка при очистке корзины. Код ошибки:", result)
+        show_notification("Корзина", f"Произошла ошибка при очистке корзины. Код ошибки: {result}", "icons/minibin-kt-full.ico")
 
 def exit_program(icon, item):
     icon.stop()
 
 def update_icon():
-    # Обновление иконки в зависимости от состояния корзины
     if is_recycle_bin_empty():
-        tray_icon.icon = create_image(empty=True)
+        tray_icon.icon = load_icon("icons/minibin-kt-empty.ico")
     else:
-        tray_icon.icon = create_image(empty=False)
+        tray_icon.icon = load_icon("icons/minibin-kt-full.ico")
 
 def is_recycle_bin_empty():
     rbinfo = SHQUERYRBINFO()
     rbinfo.cbSize = ctypes.sizeof(SHQUERYRBINFO)
     result = ctypes.windll.shell32.SHQueryRecycleBinW(None, ctypes.byref(rbinfo))
 
-    # Если ошибка, считаем корзину непустой
     if result != 0:
         print("Ошибка при запросе состояния корзины.")
         return False
 
-    # Если количество элементов в корзине больше 0, корзина не пуста
     return rbinfo.i64NumItems == 0
 
 def periodic_update():
     while True:
         update_icon()
-        time.sleep(10)  # Обновляем каждые 10 секунд
+        time.sleep(3)
 
 def create_tray_icon():
     menu_options = (item("Очистить корзину", empty_recycle_bin), item("Выход", exit_program))
     tray_menu = menu(*menu_options)
     global tray_icon
 
-    # Сначала проверяем состояние корзины и создаем иконку с соответствующим цветом
     initial_empty = is_recycle_bin_empty()
-    tray_icon = pystray.Icon("name", create_image(empty=initial_empty), "Minibin by King Triton", tray_menu)
+    tray_icon = pystray.Icon("name", load_icon("icons/minibin-kt-empty.ico") if initial_empty else load_icon("icons/minibin-kt-full.ico"), "Minibin от King Triton", tray_menu)
     return tray_icon
 
 if __name__ == "__main__":

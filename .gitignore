@@ -1,11 +1,4 @@
-*.spec
 *.png
-*.ico
-v1.py
-v2.py
-v3.py
-v4.py
-test.py
 /build/
 /dist/
 *.pyc
@@ -14,3 +7,6 @@ test.py
 __pycache__/
 *.log
 *.db
+/venv/
+/old/
+test.py
