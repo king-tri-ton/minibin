@@ -1,6 +1,5 @@
 *.png
 /build/
-/dist/
 *.pyc
 *.pyo
 *.pyd
