@@ -29,7 +29,7 @@ jobs:
 
     - name: Build EXE
       run: |
-        pyinstaller --onefile --noconsole --name="MiniBin-KT" --icon=icons/minibin-kt-full.ico app.py
+        pyinstaller --onefile --noconsole --name="MiniBin-KT" --add-data "icons;icons" --icon=icons/minibin-kt-full.ico app.py
       env:
         PYTHONIOENCODING: utf-8
 
