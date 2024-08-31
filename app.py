@@ -33,7 +33,7 @@ def show_notification(title, message, icon_path=None):
         title=title,
         message=message,
         app_icon=icon_path,  # Можно оставить пустым или указать путь к иконке
-        timeout=1  # Время отображения уведомления
+        timeout=5  # Время отображения уведомления
     )
 
 def empty_recycle_bin(icon, item):
