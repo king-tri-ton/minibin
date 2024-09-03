@@ -1,3 +1,2 @@
-pystray
-pillow
+PyQt6
 plyer
