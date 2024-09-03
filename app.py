@@ -1,11 +1,10 @@
 import ctypes
+import sys
+import os
 import threading
+import time
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 from PyQt6.QtGui import QIcon, QAction
-from PyQt6.QtCore import QTimer
-from plyer import notification
-import os
-import sys
 
 class SHQUERYRBINFO(ctypes.Structure):
     _fields_ = [
@@ -25,12 +24,7 @@ def load_icon(icon_path):
     return QIcon(resource_path(icon_path))
 
 def show_notification(title, message, icon_path=None):
-    notification.notify(
-        title=title,
-        message=message,
-        app_icon=icon_path,
-        timeout=5
-    )
+    tray_icon.showMessage(title, message, QIcon(resource_path(icon_path)), 5000)
 
 def empty_recycle_bin():
     SHEmptyRecycleBin = ctypes.windll.shell32.SHEmptyRecycleBinW
@@ -40,10 +34,11 @@ def empty_recycle_bin():
     result = SHEmptyRecycleBin(None, bin_path, flags)
 
     if result == 0 or result == -2147418113:
-        show_notification("Корзина", "Корзина успешно очищена.", resource_path("icons/minibin-kt-empty.ico"))
-        update_icon()
+        show_notification("Корзина", "Корзина успешно очищена.", "icons/minibin-kt-empty.ico")
     else:
         show_notification("Корзина", f"Произошла ошибка при очистке корзины. Код ошибки: {result}", "icons/minibin-kt-full.ico")
+    
+    update_icon()
 
 def exit_program():
     QApplication.quit()
@@ -66,29 +61,28 @@ def is_recycle_bin_empty():
     return rbinfo.i64NumItems == 0
 
 def periodic_update():
-    update_icon()
+    while True:
+        update_icon()
+        time.sleep(3)  # Интервал обновления в секундах
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    
+
     tray_icon = QSystemTrayIcon()
-    
-    initial_empty = is_recycle_bin_empty()
-    tray_icon.setIcon(load_icon("icons/minibin-kt-empty.ico") if initial_empty else load_icon("icons/minibin-kt-full.ico"))
-    
+    tray_icon.setIcon(load_icon("icons/minibin-kt-empty.ico"))
+
     tray_menu = QMenu()
-    
     empty_action = QAction("Очистить корзину", triggered=empty_recycle_bin)
     exit_action = QAction("Выход", triggered=exit_program)
-    
+
     tray_menu.addAction(empty_action)
     tray_menu.addAction(exit_action)
-    
+
     tray_icon.setContextMenu(tray_menu)
     tray_icon.show()
-    
-    timer = QTimer()
-    timer.timeout.connect(periodic_update)
-    timer.start(3000)
-    
+
+    # Запуск таймера в отдельном потоке
+    update_thread = threading.Thread(target=periodic_update, daemon=True)
+    update_thread.start()
+
     sys.exit(app.exec())
