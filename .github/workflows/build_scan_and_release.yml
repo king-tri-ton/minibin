@@ -1,4 +1,4 @@
-name: Build and Scan
+name: Build, Scan, and Release
 
 on:
   push:
@@ -43,4 +43,24 @@ jobs:
       uses: crazy-max/ghaction-virustotal@v4.0.0
       with:
         vt_api_key: ${{ secrets.VIRUSTOTAL_API_KEY }}
+        files: dist/MiniBin-KT.exe
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: built-exe
+
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        release_name: Release v${{ github.run_number }}
+        draft: false
+        prerelease: false
         files: dist/MiniBin-KT.exe
