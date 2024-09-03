@@ -29,7 +29,7 @@ jobs:
 
     - name: Build EXE
       run: |
-        pyinstaller --onefile --noconsole --name="MiniBin-KT" --add-data "icons;icons" --icon=icons/minibin-kt-full.ico --hidden-import=PyQt6.QtWidgets.QAction --hidden-import=plyer.platforms.win --hidden-import=plyer.platforms.win.notification app.py
+        pyinstaller --onefile --noconsole --name="MiniBin-KT" --add-data "icons;icons" --icon=icons/minibin-kt-full.ico --collect-submodules=PyQt6 --hidden-import=PyQt6.QtWidgets.QAction --hidden-import=plyer.platforms.win --hidden-import=plyer.platforms.win.notification app.py
       env:
         PYTHONIOENCODING: utf-8
 
