@@ -1,10 +1,11 @@
 import ctypes
-import sys
-import os
-from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction
-from PyQt6.QtGui import QIcon
+import threading
+from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
+from PyQt6.QtGui import QIcon, QAction
 from PyQt6.QtCore import QTimer
 from plyer import notification
+import os
+import sys
 
 class SHQUERYRBINFO(ctypes.Structure):
     _fields_ = [
@@ -14,7 +15,6 @@ class SHQUERYRBINFO(ctypes.Structure):
     ]
 
 def resource_path(relative_path):
-    """ Получает путь к ресурсам, поддерживает работу с PyInstaller. """
     try:
         base_path = sys._MEIPASS
     except AttributeError:
@@ -34,7 +34,7 @@ def show_notification(title, message, icon_path=None):
 
 def empty_recycle_bin():
     SHEmptyRecycleBin = ctypes.windll.shell32.SHEmptyRecycleBinW
-    flags = 0x01
+    flags = 0x01  # SHERB_NOCONFIRMATION
     bin_path = ctypes.create_unicode_buffer(260)
     ctypes.windll.shell32.SHGetFolderPathW(0, 0x0005, 0, 0, bin_path)
     result = SHEmptyRecycleBin(None, bin_path, flags)
@@ -43,7 +43,10 @@ def empty_recycle_bin():
         show_notification("Корзина", "Корзина успешно очищена.", resource_path("icons/minibin-kt-empty.ico"))
         update_icon()
     else:
-        show_notification("Корзина", f"Произошла ошибка при очистке корзины. Код ошибки: {result}", resource_path("icons/minibin-kt-full.ico"))
+        show_notification("Корзина", f"Произошла ошибка при очистке корзины. Код ошибки: {result}", "icons/minibin-kt-full.ico")
+
+def exit_program():
+    QApplication.quit()
 
 def update_icon():
     if is_recycle_bin_empty():
@@ -62,31 +65,30 @@ def is_recycle_bin_empty():
 
     return rbinfo.i64NumItems == 0
 
-def create_tray_icon():
-    app = QApplication(sys.argv)
-    tray_icon = QSystemTrayIcon()
-    tray_icon.setIcon(load_icon("icons/minibin-kt-empty.ico"))
-
-    tray_menu = QMenu()
-
-    empty_action = QAction("Очистить корзину")
-    empty_action.triggered.connect(empty_recycle_bin)
-    tray_menu.addAction(empty_action)
-
-    exit_action = QAction("Выход")
-    exit_action.triggered.connect(app.quit)
-    tray_menu.addAction(exit_action)
-
-    tray_icon.setContextMenu(tray_menu)
-    tray_icon.show()
-
-    # Timer for periodic updates
-    timer = QTimer()
-    timer.timeout.connect(update_icon)
-    timer.start(3000)  # Update every 3 seconds
-
-    return app
+def periodic_update():
+    update_icon()
 
 if __name__ == "__main__":
-    app = create_tray_icon()
+    app = QApplication(sys.argv)
+    
+    tray_icon = QSystemTrayIcon()
+    
+    initial_empty = is_recycle_bin_empty()
+    tray_icon.setIcon(load_icon("icons/minibin-kt-empty.ico") if initial_empty else load_icon("icons/minibin-kt-full.ico"))
+    
+    tray_menu = QMenu()
+    
+    empty_action = QAction("Очистить корзину", triggered=empty_recycle_bin)
+    exit_action = QAction("Выход", triggered=exit_program)
+    
+    tray_menu.addAction(empty_action)
+    tray_menu.addAction(exit_action)
+    
+    tray_icon.setContextMenu(tray_menu)
+    tray_icon.show()
+    
+    timer = QTimer()
+    timer.timeout.connect(periodic_update)
+    timer.start(3000)
+    
     sys.exit(app.exec())
