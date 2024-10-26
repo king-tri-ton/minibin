@@ -40,6 +40,9 @@ def empty_recycle_bin():
     
     update_icon()
 
+def open_recycle_bin():
+    os.startfile("shell:RecycleBinFolder")
+
 def exit_program():
     QApplication.quit()
 
@@ -72,9 +75,11 @@ if __name__ == "__main__":
     tray_icon.setIcon(load_icon("icons/minibin-kt-empty.ico"))
 
     tray_menu = QMenu()
+    open_action = QAction("Открыть корзину", triggered=open_recycle_bin)
     empty_action = QAction("Очистить корзину", triggered=empty_recycle_bin)
     exit_action = QAction("Выход", triggered=exit_program)
 
+    tray_menu.addAction(open_action)
     tray_menu.addAction(empty_action)
     tray_menu.addAction(exit_action)
 
