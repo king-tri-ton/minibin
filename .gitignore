@@ -8,6 +8,8 @@ __pycache__/
 *.log
 *.db
 /venv/
+/.venv/
+.pytest_cache/
 /myenv/
 test.py
 *.spec
