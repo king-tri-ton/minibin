@@ -1,5 +1,6 @@
 *.png
 /build/
+/output/
 *.pyc
 *.pyo
 *.pyd
