@@ -1,6 +1,6 @@
 # MiniBin - Иконка корзины в системном трее для Windows
 
-![MiniBin Logo](https://github.com/user-attachments/assets/f8a610dc-4592-4a3e-bc92-3d835cd8c565)
+![MiniBin Logo](https://github.com/user-attachments/assets/f8a610dc-4592-4a3e-bc92-3d835cd8c565) <a href="https://ibb.co/YTDBXk8V"><img src="https://i.ibb.co/VpHYxSDk/2025-08-24-175158.jpg" alt="2025-08-24-175158" border="0"></a>
 
 ## О проекте
 
