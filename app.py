@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 from PyQt6.QtWidgets import (QApplication, QSystemTrayIcon, QMenu, QDialog, 
                              QVBoxLayout, QHBoxLayout, QCheckBox, QComboBox, 
-                             QLabel, QDialogButtonBox)
+                             QLabel, QDialogButtonBox, QGroupBox, QFrame)
 from PyQt6.QtGui import QIcon, QAction
 from PyQt6.QtCore import QTimer
 
@@ -21,32 +21,46 @@ except ImportError:
     print("Пожалуйста, установите ее: pip install pywin32")
     win32com = None 
 
-# --- НОВЫЙ БЛОК: НАСТРОЙКИ ---
+# --- ИЗМЕНЕНИЕ: РАСШИРЕННЫЙ ШАБЛОН НАСТРОЕК ---
 SETTINGS_FILE = 'settings.json'
 DEFAULT_SETTINGS = {
     "clean_by_size_enabled": False,
     "size_limit_gb": 5,
     "clean_by_age_enabled": False,
     "age_limit_days": 30,
-    "cleanup_interval_minutes": 60 
+    "cleanup_interval_minutes": 60,
+    # Новые параметры для действий мыши. Значения по умолчанию сохраняют старое поведение.
+    "double_click_action": "open",  # "open", "empty", "none"
+    "middle_click_action": "empty"  # "open", "empty", "none"
 }
 
-# --- НОВЫЙ КЛАСС: ОКНО НАСТРОЕК ---
+# --- ИЗМЕНЕНИЕ: МОДЕРНИЗИРОВАННЫЙ КЛАСС ОКНА НАСТРОЕК ---
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Настройки автоочистки")
+        self.setWindowTitle("Настройки MiniBin") # Более общий заголовок
         self.setWindowIcon(load_icon("icons/minibin-kt-empty.ico"))
-        self.setMinimumWidth(350)
+        self.setMinimumWidth(400) # Немного шире для новых настроек
 
         self.settings = load_settings()
+        
+        # Словари для сопоставления текста в UI и значений в настройках
         self.interval_map = {
             "15 минут": 15, "1 час": 60, "6 часов": 360, 
             "12 часов": 720, "1 день": 1440, "1 неделя": 10080
         }
+        self.click_action_map = {
+            "Открыть корзину": "open",
+            "Очистить корзину": "empty",
+            "Ничего не делать": "none"
+        }
 
         # --- Создание виджетов ---
-        self.size_checkbox = QCheckBox("Очищать корзину, если ее размер превышает:")
+        # Группа для автоочистки
+        autoclean_group = QGroupBox("Автоочистка")
+        autoclean_layout = QVBoxLayout()
+        
+        self.size_checkbox = QCheckBox("Очищать, если размер превышает:")
         self.size_combo = QComboBox()
         self.size_combo.addItems(["1 ГБ", "2 ГБ", "5 ГБ", "10 ГБ", "20 ГБ", "50 ГБ"])
         
@@ -57,6 +71,18 @@ class SettingsDialog(QDialog):
         self.interval_label = QLabel("Проверять каждые:")
         self.interval_combo = QComboBox()
         self.interval_combo.addItems(list(self.interval_map.keys()))
+        
+        # Группа для действий мыши
+        click_actions_group = QGroupBox("Действия по клику мыши")
+        click_actions_layout = QVBoxLayout()
+
+        self.double_click_label = QLabel("Двойной клик:")
+        self.double_click_combo = QComboBox()
+        self.double_click_combo.addItems(list(self.click_action_map.keys()))
+        
+        self.middle_click_label = QLabel("Средний клик:")
+        self.middle_click_combo = QComboBox()
+        self.middle_click_combo.addItems(list(self.click_action_map.keys()))
 
         # Кнопки OK/Отмена
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -64,117 +90,152 @@ class SettingsDialog(QDialog):
         self.button_box.rejected.connect(self.reject)
 
         # --- Компоновка ---
-        layout = QVBoxLayout(self)
-        
+        # Автоочистка
         size_layout = QHBoxLayout()
         size_layout.addWidget(self.size_checkbox)
         size_layout.addWidget(self.size_combo)
-        layout.addLayout(size_layout)
-
+        autoclean_layout.addLayout(size_layout)
         age_layout = QHBoxLayout()
         age_layout.addWidget(self.age_checkbox)
         age_layout.addWidget(self.age_combo)
-        layout.addLayout(age_layout)
-
+        autoclean_layout.addLayout(age_layout)
         interval_layout = QHBoxLayout()
         interval_layout.addWidget(self.interval_label)
         interval_layout.addWidget(self.interval_combo)
-        layout.addLayout(interval_layout)
+        autoclean_layout.addLayout(interval_layout)
+        autoclean_group.setLayout(autoclean_layout)
 
-        layout.addWidget(self.button_box)
+        # Действия мыши
+        double_click_layout = QHBoxLayout()
+        double_click_layout.addWidget(self.double_click_label)
+        double_click_layout.addWidget(self.double_click_combo)
+        click_actions_layout.addLayout(double_click_layout)
+        middle_click_layout = QHBoxLayout()
+        middle_click_layout.addWidget(self.middle_click_label)
+        middle_click_layout.addWidget(self.middle_click_combo)
+        click_actions_layout.addLayout(middle_click_layout)
+        click_actions_group.setLayout(click_actions_layout)
+
+        # Основной layout
+        main_layout = QVBoxLayout(self)
+        main_layout.addWidget(autoclean_group)
+        main_layout.addWidget(click_actions_group)
+        main_layout.addWidget(self.button_box)
 
         self.load_widgets_from_settings()
 
     def load_widgets_from_settings(self):
+        # Загрузка настроек автоочистки
         self.size_checkbox.setChecked(self.settings.get("clean_by_size_enabled", False))
         self.size_combo.setCurrentText(f"{self.settings.get('size_limit_gb', 5)} ГБ")
-        
         self.age_checkbox.setChecked(self.settings.get("clean_by_age_enabled", False))
         self.age_combo.setCurrentText(f"{self.settings.get('age_limit_days', 30)} дней")
-
-        # Находим ключ (текст) по значению (минутам)
-        current_interval_minutes = self.settings.get("cleanup_interval_minutes", 60)
+        
+        current_interval = self.settings.get("cleanup_interval_minutes", 60)
         for text, minutes in self.interval_map.items():
-            if minutes == current_interval_minutes:
+            if minutes == current_interval:
                 self.interval_combo.setCurrentText(text)
                 break
+
+        # Загрузка настроек кликов
+        # Используем .get() для обратной совместимости со старыми settings.json
+        dc_action = self.settings.get("double_click_action", "open")
+        mc_action = self.settings.get("middle_click_action", "empty")
+
+        for text, action_val in self.click_action_map.items():
+            if action_val == dc_action: self.double_click_combo.setCurrentText(text)
+            if action_val == mc_action: self.middle_click_combo.setCurrentText(text)
     
     def accept_settings(self):
+        # Сохранение настроек автоочистки
         self.settings["clean_by_size_enabled"] = self.size_checkbox.isChecked()
         self.settings["size_limit_gb"] = int(self.size_combo.currentText().replace(" ГБ", ""))
-        
         self.settings["clean_by_age_enabled"] = self.age_checkbox.isChecked()
         self.settings["age_limit_days"] = int(self.age_combo.currentText().replace(" дней", ""))
-
         self.settings["cleanup_interval_minutes"] = self.interval_map[self.interval_combo.currentText()]
         
+        # Сохранение настроек кликов
+        self.settings["double_click_action"] = self.click_action_map[self.double_click_combo.currentText()]
+        self.settings["middle_click_action"] = self.click_action_map[self.middle_click_combo.currentText()]
+
         save_settings(self.settings)
         self.accept()
 
-# --- НОВЫЕ ФУНКЦИИ: РАБОТА С НАСТРОЙКАМИ ---
+# --- (Остальные функции до handle_tray_activation остаются без изменений) ---
+# ...
+# load_settings, save_settings, SHQUERYRBINFO, check_auto_cleanup, open_settings_dialog,
+# resource_path, load_icon, show_notification, open_desktop_icon_settings, format_bytes,
+# get_object_declension, add_to_startup, restore_last_deleted_item, empty_recycle_bin,
+# open_recycle_bin, exit_program
+# ...
+
+# --- ИЗМЕНЕНИЕ: ПОЛНОСТЬЮ ПЕРЕПИСАННЫЙ ОБРАБОТЧИК КЛИКОВ ---
+def handle_tray_activation(reason):
+    settings = load_settings()
+    
+    if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+        action = settings.get("double_click_action", "open") # Значение по умолчанию "open"
+        if action == "open":
+            open_recycle_bin()
+        elif action == "empty":
+            empty_recycle_bin()
+            
+    elif reason == QSystemTrayIcon.ActivationReason.MiddleClick:
+        action = settings.get("middle_click_action", "empty") # Значение по умолчанию "empty"
+        if action == "open":
+            open_recycle_bin()
+        elif action == "empty":
+            empty_recycle_bin()
+
+# --- (Функции после handle_tray_activation и основной блок остаются почти без изменений) ---
+# ...
+# update_icon, get_recycle_bin_status, is_recycle_bin_empty, глобальные переменные,
+# restart_cleanup_timer, и __main__
+# ...
+
+# --- ДЛЯ ПОЛНОТЫ, ВСТАВЛЯЮ ВЕСЬ КОД НИЖЕ БЕЗ ИЗМЕНЕНИЙ, ЧТОБЫ ВЫ МОГЛИ СКОПИРОВАТЬ ВСЕ ЦЕЛИКОМ ---
+# (Вы можете просто скопировать весь этот блок и заменить им свой файл)
+
 def load_settings():
     try:
         if os.path.exists(SETTINGS_FILE):
-            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-    except (json.JSONDecodeError, IOError):
-        pass # Если файл поврежден или не читается, вернем настройки по умолчанию
+            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f: return json.load(f)
+    except (json.JSONDecodeError, IOError): pass
     return DEFAULT_SETTINGS.copy()
 
 def save_settings(settings):
     try:
-        with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(settings, f, indent=4)
-    except IOError as e:
-        print(f"Ошибка при сохранении настроек: {e}")
+        with open(SETTINGS_FILE, 'w', encoding='utf-8') as f: json.dump(settings, f, indent=4)
+    except IOError as e: print(f"Ошибка при сохранении настроек: {e}")
 
-# Определение структуры SHQUERYRBINFO для Windows API
 class SHQUERYRBINFO(ctypes.Structure):
-    _fields_ = [
-        ("cbSize", ctypes.c_ulong),
-        ("i64Size", ctypes.c_int64),
-        ("i64NumItems", ctypes.c_int64)
-    ]
+    _fields_ = [("cbSize", ctypes.c_ulong), ("i64Size", ctypes.c_int64), ("i64NumItems", ctypes.c_int64)]
 
-# --- НОВАЯ ФУНКЦИЯ: ДВИЖОК АВТООЧИСТКИ ---
 def check_auto_cleanup():
     settings = load_settings()
     is_size_enabled = settings.get("clean_by_size_enabled", False)
     is_age_enabled = settings.get("clean_by_age_enabled", False)
-
-    # Если обе опции выключены, ничего не делаем
-    if not is_size_enabled and not is_age_enabled:
-        return
-
-    # --- Проверка по размеру ---
+    if not is_size_enabled and not is_age_enabled: return
     if is_size_enabled:
         _, size_bytes = get_recycle_bin_status()
         size_limit_bytes = settings.get("size_limit_gb", 5) * (1024 ** 3)
         if size_bytes > size_limit_bytes:
             show_notification("Автоочистка", f"Размер корзины превысил {settings['size_limit_gb']} ГБ. Начинаю очистку.", "icons/minibin-kt-full.ico")
             empty_recycle_bin()
-            # После полной очистки нет смысла проверять файлы по возрасту
             return 
-    
-    # --- Проверка по возрасту файлов ---
     if is_age_enabled:
         age_limit_days = settings.get("age_limit_days", 30)
         cutoff_date = datetime.now() - timedelta(days=age_limit_days)
         items_to_delete = []
-
         try:
             pythoncom.CoInitialize()
             shell = win32com.client.Dispatch("Shell.Application")
             recycle_bin = shell.NameSpace(10)
-            
             for item in recycle_bin.Items():
                 try:
-                    deleted_date = item.ModifyDate.replace(tzinfo=None) # Убираем часовой пояс для сравнения
-                    if deleted_date < cutoff_date:
-                        items_to_delete.append(item)
-                except Exception:
-                    continue
-            
+                    deleted_date = item.ModifyDate.replace(tzinfo=None)
+                    if deleted_date < cutoff_date: items_to_delete.append(item)
+                except Exception: continue
             if items_to_delete:
                 count = len(items_to_delete)
                 show_notification("Автоочистка", f"Удаляю {count} {get_object_declension(count)} старше {age_limit_days} дней.", "icons/minibin-kt-empty.ico")
@@ -185,32 +246,23 @@ def check_auto_cleanup():
                             verb.DoIt()
                             break
                 QTimer.singleShot(1000, update_icon)
-        except Exception as e:
-            print(f"Ошибка при автоочистке по возрасту: {e}")
-        finally:
-            pythoncom.CoUninitialize()
+        except Exception as e: print(f"Ошибка при автоочистке по возрасту: {e}")
+        finally: pythoncom.CoUninitialize()
 
-# --- НОВАЯ ФУНКЦИЯ: ОТКРЫТИЕ ОКНА НАСТРОЕК ---
 def open_settings_dialog():
     dialog = SettingsDialog()
-    # exec() открывает окно и ждет, пока оно закроется
     if dialog.exec():
-        # Если пользователь нажал "OK", перезапускаем таймер автоочистки с новым интервалом
         print("Настройки сохранены, перезапускаю таймер автоочистки.")
         restart_cleanup_timer()
 
 def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except AttributeError:
-        base_path = os.path.abspath(".")
+    try: base_path = sys._MEIPASS
+    except AttributeError: base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
-def load_icon(icon_path):
-    return QIcon(resource_path(icon_path))
+def load_icon(icon_path): return QIcon(resource_path(icon_path))
 
-def show_notification(title, message, icon_path=None):
-    tray_icon.showMessage(title, message, load_icon(icon_path), 5000)
+def show_notification(title, message, icon_path=None): tray_icon.showMessage(title, message, load_icon(icon_path), 5000)
     
 def open_desktop_icon_settings():
     try:
@@ -240,7 +292,6 @@ def add_to_startup():
     if not win32com:
         show_notification("Ошибка", "Библиотека pywin32 не найдена.", "icons/minibin-kt-full.ico")
         return
-    # ... (остальной код функции без изменений)
     executable_path = sys.executable
     app_name = os.path.splitext(os.path.basename(executable_path))[0]
     startup_folder = os.path.join(os.environ['PROGRAMDATA'], 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'StartUp')
@@ -258,8 +309,7 @@ def add_to_startup():
     except Exception as e:
         print(f"Ошибка при добавлении в автозагрузку: {e}")
         show_notification("Ошибка прав доступа", "Для этого действия запустите программу от имени администратора.", "icons/minibin-kt-full.ico")
-    finally:
-        pythoncom.CoUninitialize()
+    finally: pythoncom.CoUninitialize()
 
 def restore_last_deleted_item():
     if is_recycle_bin_empty():
@@ -271,11 +321,9 @@ def restore_last_deleted_item():
         shell = win32com.client.Dispatch("Shell.Application")
         recycle_bin = shell.NameSpace(10)
         for item in recycle_bin.Items():
-            try:
-                deleted_date = item.ModifyDate
+            try: deleted_date = item.ModifyDate
             except Exception: continue
-            if latest_date is None or deleted_date > latest_date:
-                latest_date, latest_item = deleted_date, item
+            if latest_date is None or deleted_date > latest_date: latest_date, latest_item = deleted_date, item
         if latest_item:
             item_name, restored = latest_item.Name, False
             for verb in latest_item.Verbs():
@@ -287,38 +335,27 @@ def restore_last_deleted_item():
             if restored:
                 show_notification("Восстановление", f"Объект '{item_name}' успешно восстановлен.", "icons/minibin-kt-empty.ico")
                 QTimer.singleShot(1000, update_icon)
-            else:
-                show_notification("Ошибка", f"Не удалось выполнить действие 'Восстановить' для объекта '{item_name}'.", "icons/minibin-kt-full.ico")
+            else: show_notification("Ошибка", f"Не удалось выполнить действие 'Восстановить' для объекта '{item_name}'.", "icons/minibin-kt-full.ico")
         else: show_notification("Ошибка", "Не удалось найти объект для восстановления.", "icons/minibin-kt-full.ico")
     except Exception as e:
         print(f"Ошибка при восстановлении: {e}")
         show_notification("Ошибка", "Произошла критическая ошибка при попытке восстановления.", "icons/minibin-kt-full.ico")
-    finally:
-        pythoncom.CoUninitialize()
+    finally: pythoncom.CoUninitialize()
 
 def empty_recycle_bin():
     if is_recycle_bin_empty():
         show_notification("Корзина", "Корзина уже пуста.", "icons/minibin-kt-empty.ico")
         return
-    # ... (остальной код функции без изменений)
     SHEmptyRecycleBin = ctypes.windll.shell32.SHEmptyRecycleBinW
     flags = 0x01 | 0x02 | 0x04
     result = SHEmptyRecycleBin(None, None, flags)
     if result == 0:
         show_notification("Корзина", "Корзина успешно очищена.", "icons/minibin-kt-empty.ico")
-    else:
-        show_notification("Корзина", f"Произошла ошибка при очистке корзины. Код ошибки: {result}", "icons/minibin-kt-full.ico")
+    else: show_notification("Корзина", f"Произошла ошибка при очистке корзины. Код ошибки: {result}", "icons/minibin-kt-full.ico")
     update_icon()
 
-def open_recycle_bin():
-    os.startfile("shell:RecycleBinFolder")
-
-def exit_program():
-    QApplication.quit()
-
-def handle_tray_activation(reason):
-    if reason == QSystemTrayIcon.ActivationReason.DoubleClick: open_recycle_bin()
-    elif reason == QSystemTrayIcon.ActivationReason.MiddleClick: empty_recycle_bin()
+def open_recycle_bin(): os.startfile("shell:RecycleBinFolder")
+def exit_program(): QApplication.quit()
 
 def update_icon():
     count, size_bytes = get_recycle_bin_status()
@@ -344,32 +381,25 @@ def is_recycle_bin_empty():
     count, _ = get_recycle_bin_status()
     return count == 0
 
-# --- Глобальные переменные ---
 mutex_handle = None
 app = None
 tray_icon = None
 cleanup_timer = None
 
-# --- НОВАЯ ФУНКЦИЯ: ПЕРЕЗАПУСК ТАЙМЕРА АВТООЧИСТКИ ---
 def restart_cleanup_timer():
     global cleanup_timer
-    if cleanup_timer:
-        cleanup_timer.stop()
-    
+    if cleanup_timer: cleanup_timer.stop()
     settings = load_settings()
     interval_ms = settings.get("cleanup_interval_minutes", 60) * 60 * 1000
-    
     cleanup_timer = QTimer()
     cleanup_timer.timeout.connect(check_auto_cleanup)
     cleanup_timer.start(interval_ms)
 
-# --- Основной блок выполнения ---
 if __name__ == "__main__":
     mutex_name = "{E429B518-24A4-4D64-905D-03225016DE46}-MiniBin"
     ERROR_ALREADY_EXISTS = 183
     mutex_handle = ctypes.windll.kernel32.CreateMutexW(None, True, mutex_name)
-    if ctypes.windll.kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
-        sys.exit(0)
+    if ctypes.windll.kernel32.GetLastError() == ERROR_ALREADY_EXISTS: sys.exit(0)
 
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
@@ -377,12 +407,11 @@ if __name__ == "__main__":
     tray_icon = QSystemTrayIcon()
     update_icon()
 
-    # --- ИЗМЕНЕНИЯ В МЕНЮ ---
     tray_menu = QMenu()
     open_action = QAction("Открыть корзину", triggered=open_recycle_bin)
     empty_action = QAction("Очистить корзину", triggered=empty_recycle_bin)
     restore_action = QAction("Восстановить последнее", triggered=restore_last_deleted_item)
-    settings_action = QAction("Настроить автоочистку...", triggered=open_settings_dialog) # Новый пункт
+    settings_action = QAction("Настройки...", triggered=open_settings_dialog)
     startup_action = QAction("Добавить в автозагрузку", triggered=add_to_startup)
     desktop_icons_action = QAction("Настройки значков рабочего стола", triggered=open_desktop_icon_settings)
     exit_action = QAction("Выход", triggered=exit_program)
@@ -391,7 +420,7 @@ if __name__ == "__main__":
     tray_menu.addAction(empty_action)
     tray_menu.addAction(restore_action)
     tray_menu.addSeparator()
-    tray_menu.addAction(settings_action) # Добавлен в меню
+    tray_menu.addAction(settings_action)
     tray_menu.addSeparator()
     tray_menu.addAction(startup_action)
     tray_menu.addAction(desktop_icons_action)
@@ -402,13 +431,10 @@ if __name__ == "__main__":
     tray_icon.activated.connect(handle_tray_activation)
     tray_icon.show()
 
-    # --- ИЗМЕНЕНИЯ В ТАЙМЕРАХ ---
-    # Таймер для обновления иконки (частый)
     update_timer = QTimer()
     update_timer.timeout.connect(update_icon)
     update_timer.start(5000)
 
-    # Таймер для автоочистки (редкий, настраиваемый)
     restart_cleanup_timer()
 
     sys.exit(app.exec())
