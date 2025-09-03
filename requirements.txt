@@ -1,2 +1,4 @@
 PyQt6
-plyer
+pywin32
+pytest
+pytest-mock

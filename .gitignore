@@ -1,5 +1,6 @@
 *.png
 /build/
+/output/
 *.pyc
 *.pyo
 *.pyd
@@ -7,6 +8,9 @@ __pycache__/
 *.log
 *.db
 /venv/
+/.venv/
+.pytest_cache/
 /myenv/
 test.py
 *.spec
+settings.json
