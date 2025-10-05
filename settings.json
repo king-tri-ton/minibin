@@ -1,9 +1,0 @@
-{
-    "clean_by_size_enabled": true,
-    "size_limit_gb": 5,
-    "clean_by_age_enabled": true,
-    "age_limit_days": 30,
-    "cleanup_interval_minutes": 1440,
-    "double_click_action": "open",
-    "middle_click_action": "empty"
-}
