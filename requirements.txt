@@ -1,4 +1,1 @@
-PyQt6
-pywin32
-pytest
-pytest-mock
+PyQt6==6.10.0

@@ -4,8 +4,10 @@ import os
 import threading
 import time
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
-from PyQt6.QtGui import QIcon, QAction
+from PyQt6.QtGui import QIcon, QAction, QCursor
+from PyQt6.QtCore import QTimer, QPoint
 import winreg
+from settings import SettingsWindow, load_setting
 
 class SHQUERYRBINFO(ctypes.Structure):
     _fields_ = [
@@ -13,20 +15,6 @@ class SHQUERYRBINFO(ctypes.Structure):
         ("i64Size", ctypes.c_int64),
         ("i64NumItems", ctypes.c_int64)
     ]
-
-def save_setting(name, value):
-    key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\MiniBinKT")
-    winreg.SetValueEx(key, name, 0, winreg.REG_DWORD, int(value))
-    winreg.CloseKey(key)
-
-def load_setting(name, default=True):
-    try:
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\MiniBinKT")
-        value, _ = winreg.QueryValueEx(key, name)
-        winreg.CloseKey(key)
-        return bool(value)
-    except FileNotFoundError:
-        return default
 
 def resource_path(relative_path):
     try:
@@ -38,23 +26,16 @@ def resource_path(relative_path):
 def load_icon(icon_path):
     return QIcon(resource_path(icon_path))
 
-def show_notification(title, message, icon_path=None):
-    tray_icon.showMessage(title, message, QIcon(resource_path(icon_path)), 5000)
-
-def empty_recycle_bin():
-    SHEmptyRecycleBin = ctypes.windll.shell32.SHEmptyRecycleBinW
-    flags = 0x01 # SHERB_NOCONFIRMATION
-    result = SHEmptyRecycleBin(None, None, flags)
-
-    if result == 0 or result == -2147418113:
-        show_notification("Корзина", "Корзина успешно очищена.", "icons/minibin-kt-empty.ico")
-    else:
-        show_notification("Корзина", f"Произошла ошибка при очистке корзины. Код ошибки: {result}", "icons/minibin-kt-full.ico")
-
-    update_icon()
-
 def open_recycle_bin():
     os.startfile("shell:RecycleBinFolder")
+
+def open_settings():
+    global settings_window
+    if 'settings_window' not in globals() or settings_window is None:
+        settings_window = SettingsWindow()
+    settings_window.show()
+    settings_window.raise_()
+    settings_window.activateWindow()
 
 def exit_program():
     QApplication.quit()
@@ -64,73 +45,75 @@ def update_icon():
         tray_icon.setIcon(load_icon("icons/minibin-kt-empty.ico"))
     else:
         tray_icon.setIcon(load_icon("icons/minibin-kt-full.ico"))
+    
+    # Принудительное обновление трея для Windows 11
+    if not tray_icon.isVisible():
+        tray_icon.hide()
+        tray_icon.show()
 
 def is_recycle_bin_empty():
     rbinfo = SHQUERYRBINFO()
     rbinfo.cbSize = ctypes.sizeof(SHQUERYRBINFO)
     result = ctypes.windll.shell32.SHQueryRecycleBinW(None, ctypes.byref(rbinfo))
-
     if result != 0:
-        print("Ошибка при запросе состояния корзины.")
         return False
-
     return rbinfo.i64NumItems == 0
 
-def periodic_update():
-    while True:
-        update_icon()
-        time.sleep(3)
+def empty_recycle_bin():
+    SHEmptyRecycleBin = ctypes.windll.shell32.SHEmptyRecycleBinW
+    
+    show_confirmation = load_setting("show_confirmation", False)
+    flags = 0x00 if show_confirmation else 0x01
+    
+    result = SHEmptyRecycleBin(None, None, flags)
+    show_notifications = load_setting("show_notification", True)
+    
+    if result == 0 or result == -2147418113:
+        if show_notifications:
+            icon = load_icon("icons/minibin-kt-empty.ico")
+            tray_icon.showMessage("Корзина", "Корзина успешно очищена.", icon, 5000)
+    else:
+        if show_notifications:
+            tray_icon.showMessage("Корзина", f"Произошла ошибка при очистке корзины. Код ошибки: {result}", load_icon("icons/minibin-kt-full.ico"), 5000)
+    
+    # Обновляем иконку с небольшой задержкой для стабильности
+    QTimer.singleShot(100, update_icon)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-
+    app.setQuitOnLastWindowClosed(False)
+    
     tray_icon = QSystemTrayIcon()
     tray_icon.setIcon(load_icon("icons/minibin-kt-empty.ico"))
-
+    
     tray_menu = QMenu()
-
     open_action = QAction("Открыть корзину", triggered=open_recycle_bin)
-    exit_action = QAction("Выход", triggered=exit_program)
-
-    show_notification_flag = load_setting("show_notification")
-    toggle_notification_action = QAction("Скрывать уведомление", checkable=True)
-    toggle_notification_action.setChecked(not show_notification_flag)
-
-    def toggle_notification():
-        new_state = not toggle_notification_action.isChecked()
-        save_setting("show_notification", new_state)
-
-    toggle_notification_action.triggered.connect(toggle_notification)
-
-    tray_icon.setContextMenu(tray_menu)
-    tray_icon.show()
-
-    def show_notification_conditional(title, message, icon_path=None):
-        if load_setting("show_notification"):
-            tray_icon.showMessage(title, message, QIcon(resource_path(icon_path)), 5000)
-
-    def empty_recycle_bin():
-        SHEmptyRecycleBin = ctypes.windll.shell32.SHEmptyRecycleBinW
-        flags = 0x01 # SHERB_NOCONFIRMATION
-        result = SHEmptyRecycleBin(None, None, flags)
-
-        if result == 0 or result == -2147418113:
-            show_notification_conditional("Корзина", "Корзина успешно очищена.", "icons/minibin-kt-empty.ico")
-        else:
-            show_notification_conditional("Корзина", f"Произошла ошибка при очистке корзины. Код ошибки: {result}", "icons/minibin-kt-full.ico")
-
-        update_icon()
-
     empty_action = QAction("Очистить корзину", triggered=empty_recycle_bin)
-
+    settings_action = QAction("Настройки", triggered=open_settings)
+    exit_action = QAction("Выход", triggered=exit_program)
+    
     tray_menu.addAction(open_action)
     tray_menu.addSeparator()
     tray_menu.addAction(empty_action)
-    tray_menu.addAction(toggle_notification_action)
+    tray_menu.addAction(settings_action)
     tray_menu.addSeparator()
     tray_menu.addAction(exit_action)
-
-    update_thread = threading.Thread(target=periodic_update, daemon=True)
-    update_thread.start()
-
+    
+    # Функция для показа меню над панелью задач
+    def show_tray_menu(reason):
+        if reason == QSystemTrayIcon.ActivationReason.Context:
+            # Получаем геометрию иконки в трее
+            icon_geometry = tray_icon.geometry()
+            menu_height = tray_menu.sizeHint().height()
+            # Позиционируем меню над иконкой в трее
+            tray_menu.popup(QPoint(icon_geometry.x(), icon_geometry.y() - menu_height))
+    
+    tray_icon.activated.connect(show_tray_menu)
+    tray_icon.show()
+    
+    # Используем QTimer вместо threading для обновления иконки
+    update_timer = QTimer()
+    update_timer.timeout.connect(update_icon)
+    update_timer.start(3000)
+    
     sys.exit(app.exec())

@@ -1,44 +1,74 @@
 name: Build and Scan
-
 on:
   push:
     branches:
       - master
+    paths:
+      - 'app.py'
+      - 'settings.py'
+      - 'requirements.txt'
+      - 'icons/**'
+      - '.github/workflows/build_and_scan.yml'
   pull_request:
     branches:
       - master
-
+    paths:
+      - 'app.py'
+      - 'settings.py'
+      - 'requirements.txt'
+      - 'icons/**'
+      - '.github/workflows/build_and_scan.yml'
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
+    
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.x'
-
+        python-version: '3.12'
+    
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
-
+    
     - name: Build EXE
       run: |
-        pyinstaller --onefile --noconsole --name="MiniBin-KT" --add-data "icons;icons" --icon=icons/minibin-kt-full.ico --hidden-import=plyer.platforms.win --hidden-import=plyer.platforms.win.notification app.py
+        python -m PyInstaller --clean --noupx --onefile --noconsole --icon=icons/minibin-kt-full.ico --add-data "icons;icons" --name="MiniBin-KT" app.py
       env:
         PYTHONIOENCODING: utf-8
-
+    
+    - name: Restore code signing certificate
+      shell: powershell
+      run: |
+        $pfxBase64 = "${{ secrets.PFX_BASE64 }}"
+        $pfxBytes = [System.Convert]::FromBase64String($pfxBase64)
+        [IO.File]::WriteAllBytes("kingtriton.pfx", $pfxBytes)
+    
+    - name: Install Windows SDK Signing Tools
+      shell: powershell
+      run: |
+        choco install windows-sdk-10-version-2004-all -y
+    
+    - name: Sign EXE
+      shell: powershell
+      run: |
+        $signtool = "${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe"
+        if (!(Test-Path $signtool)) {
+          $signtool = "${env:ProgramFiles(x86)}\Windows Kits\10\bin\x64\signtool.exe"
+        }
+        & "$signtool" sign /f kingtriton.pfx /p "${{ secrets.PFX_PASSWORD }}" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "dist\MiniBin-KT.exe"
+    
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: built-exe
+        name: MiniBin-KT
         path: dist/MiniBin-KT.exe
-
+    
     - name: VirusTotal GitHub Action
       uses: crazy-max/ghaction-virustotal@v4.0.0
       with:
