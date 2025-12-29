@@ -1,12 +1,13 @@
 # Minibin - Утилита для Очистки Корзины в Windows 10/11
 
-![MiniBin](minibin-banner.png)
-
 ![Downloads](https://img.shields.io/github/downloads/king-tri-ton/minibin/total)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Platform](https://img.shields.io/badge/platform-Windows_10-lightgrey)
+![Platform](https://img.shields.io/badge/platform-Windows_10-blue)
+![Platform](https://img.shields.io/badge/platform-Windows%2011-blue)
 ![Python Version](https://img.shields.io/badge/python-3.7%2B-blue)
 [![All Contributors](https://img.shields.io/badge/all_contributors-3-orange.svg?style=flat-square)](#contributors)
+
+![MiniBin](minibin-banner.png)
 
 ## Особенности
 
@@ -16,12 +17,13 @@
 
 ## Установка
 
-1. Скачайте последний релиз из [репозитория](https://github.com/king-tri-ton/minibin/releases).
+1. Скачайте последний [релиз](https://github.com/king-tri-ton/minibin/releases).
 2. Разархивируйте архив в удобное место на вашем компьютере.
+2. Запустите MiniBinKT.exe.
 
 ## Использование
 
-1. Запустите программу, щелкнув 2 раза по `minibin-kt.exe`.
+1. Запустите программу, щелкнув 2 раза по `MiniBinKT.exe`.
 2. Щёлкните правой кнопкой мыши на иконке в трее для отображения доступных опций:
 
    * **Открыть корзину** - открыть стандартное окно корзины.
@@ -35,9 +37,9 @@
 
 ## Удаление программы
 
-Minibin — это portable-приложение, которое не требует установки. Однако программа сохраняет свои настройки в реестре Windows.
+Minibin сохраняет свои настройки в реестре Windows.
 
-### Что остается в системе после удаления:
+### Что остается в системе до удаления:
 
 1. **Настройки программы** в ключе реестра:
    ```
@@ -141,6 +143,16 @@ Minibin позволяет заменить стандартные иконки 
 - Telegram: [@king_tri_ton](https://t.me/king_tri_ton)
 - Email: [mdolmatov99@gmail.com](mailto:mdolmatov99@gmail.com)
 - или создавайте issues
+
+---
+
+## 🌟 Поддержите проект
+
+Если проект вам понравился:
+
+* ⭐ Поставьте звезду
+* 📢 Поделитесь с друзьями
+* 💬 Напишите отзыв в Telegram
 
 ---
 
