@@ -1,7 +1,9 @@
 import winreg
 import sys
 import os
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QCheckBox, QPushButton, QLabel, QMessageBox, QApplication, QFileDialog, QHBoxLayout
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QCheckBox, QPushButton, 
+                             QLabel, QMessageBox, QApplication, QFileDialog, 
+                             QHBoxLayout, QComboBox, QTabWidget, QWidget)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 
@@ -16,6 +18,20 @@ def load_setting(name, default=True):
 		value, _ = winreg.QueryValueEx(key, name)
 		winreg.CloseKey(key)
 		return bool(value)
+	except (FileNotFoundError, WindowsError):
+		return default
+
+def save_string_setting(name, value):
+	key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\MiniBinKT")
+	winreg.SetValueEx(key, name, 0, winreg.REG_SZ, str(value))
+	winreg.CloseKey(key)
+
+def load_string_setting(name, default="none"):
+	try:
+		key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\MiniBinKT")
+		value, _ = winreg.QueryValueEx(key, name)
+		winreg.CloseKey(key)
+		return value
 	except (FileNotFoundError, WindowsError):
 		return default
 
@@ -47,34 +63,12 @@ def resource_path(relative_path):
 		base_path = os.path.abspath(".")
 	return os.path.join(base_path, relative_path)
 
-
-
-
-def get_custom_icons_folder():
-	"""Возвращает путь к папке с пользовательскими иконками"""
-	if getattr(sys, 'frozen', False):
-		# Если запущен exe
-		base_dir = os.path.dirname(sys.executable)
-	else:
-		# Если запущен из Python
-		base_dir = os.path.dirname(os.path.abspath(__file__))
-	
-	custom_folder = os.path.join(base_dir, "custom_icons")
-	
-	# Создаем папку если её нет
-	if not os.path.exists(custom_folder):
-		os.makedirs(custom_folder)
-	
-	return custom_folder
-
 def save_icon_path(icon_type, path):
-	"""Сохраняет путь к кастомной иконке (icon_type: 'empty' или 'full')"""
 	key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\MiniBinKT")
 	winreg.SetValueEx(key, f"custom_icon_{icon_type}", 0, winreg.REG_SZ, path)
 	winreg.CloseKey(key)
 
 def load_icon_path(icon_type):
-	"""Загружает путь к кастомной иконке"""
 	try:
 		key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\MiniBinKT")
 		value, _ = winreg.QueryValueEx(key, f"custom_icon_{icon_type}")
@@ -83,8 +77,7 @@ def load_icon_path(icon_type):
 	except (FileNotFoundError, WindowsError):
 		return None
 
-def reset_icon(icon_type):
-	"""Сбрасывает иконку на дефолтную"""
+def delete_icon_setting(icon_type):
 	try:
 		key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\MiniBinKT", 0, winreg.KEY_SET_VALUE)
 		winreg.DeleteValue(key, f"custom_icon_{icon_type}")
@@ -93,13 +86,11 @@ def reset_icon(icon_type):
 		pass
 
 
-
-
 class SettingsWindow(QDialog):
 	def __init__(self, parent=None):
 		super().__init__(parent)
 		self.setWindowTitle("Настройки MiniBinKT")
-		self.setFixedSize(420, 500) # 365 x 310
+		self.setFixedSize(380, 200)
 		self.setWindowFlags(Qt.WindowType.WindowCloseButtonHint | Qt.WindowType.WindowTitleHint)
 		self.setWindowIcon(QIcon(resource_path("icons/minibin-settings.ico")))
 
@@ -123,13 +114,51 @@ class SettingsWindow(QDialog):
 				color: #2E5C8A;
 				border: none;
 				border-radius: 5px;
-				padding: 10px 15px;
+				padding: 8px 12px;
 				font-weight: bold;
-				font-size: 10pt;
-				min-height: 16px;
+				font-size: 9pt;
+				min-height: 14px;
 			}
 			QPushButton:hover {
 				background-color: #E8F4FF;
+			}
+			QComboBox {
+				background-color: white;
+				color: #2E5C8A;
+				border: none;
+				border-radius: 5px;
+				padding: 4px 8px;
+				font-size: 9pt;
+				min-width: 140px;
+			}
+			QComboBox QAbstractItemView {
+				background-color: white;
+				color: #2E5C8A;
+				selection-background-color: #E8F4FF;
+			}
+			/* Стилизация вкладок */
+			QTabWidget::pane {
+				border: none;
+				background: transparent;
+			}
+			QTabBar::tab {
+				background-color: #5596DD;
+				color: #E8F4FF;
+				border-top-left-radius: 4px;
+				border-top-right-radius: 4px;
+				padding: 6px 12px;
+				font-weight: bold;
+				font-size: 9pt;
+				margin-right: 2px;
+			}
+			QTabBar::tab:selected {
+				background-color: #69ACF2;
+				color: white;
+				border-bottom: 2px solid white;
+			}
+			QTabBar::tab:hover:!selected {
+				background-color: #60A1E8;
+				color: white;
 			}
 		""")
 
@@ -137,95 +166,175 @@ class SettingsWindow(QDialog):
 		self.load_settings()
 
 	def init_ui(self):
-		layout = QVBoxLayout()
-		layout.setSpacing(15)
-		layout.setContentsMargins(30, 25, 30, 25)
+		main_layout = QVBoxLayout()
+		main_layout.setSpacing(10)
+		main_layout.setContentsMargins(15, 15, 15, 15)
 
-		title = QLabel("Настройки MiniBinKT")
-		title.setStyleSheet("font-weight: bold; font-size: 14pt; color: white;")
-		title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-		layout.addWidget(title)
+		self.tab_widget = QTabWidget()
 
-		layout.addSpacing(10)
+		tab_general = QWidget()
+		gen_layout = QVBoxLayout(tab_general)
+		gen_layout.setSpacing(12)
+		gen_layout.setContentsMargins(5, 15, 5, 5)
 
-		section1 = QLabel("Параметры уведомлений:")
-		section1.setStyleSheet("font-weight: bold; font-size: 10pt;")
-		layout.addWidget(section1)
+		self.notification_checkbox = QCheckBox("Уведомления при очистке корзины")
+		self.confirmation_checkbox = QCheckBox("Предупреждение перед очисткой")
+		self.autostart_checkbox = QCheckBox("Запускать при старте Windows")
 
-		self.notification_checkbox = QCheckBox("Показывать уведомления при очистке корзины")
-		layout.addWidget(self.notification_checkbox)
+		gen_layout.addWidget(self.notification_checkbox)
+		gen_layout.addWidget(self.confirmation_checkbox)
+		gen_layout.addWidget(self.autostart_checkbox)
+		gen_layout.addStretch()
+		self.tab_widget.addTab(tab_general, "Основные")
 
-		self.confirmation_checkbox = QCheckBox("Показывать предупреждение перед очисткой")
-		layout.addWidget(self.confirmation_checkbox)
+		tab_icons = QWidget()
+		icons_layout = QVBoxLayout(tab_icons)
+		icons_layout.setSpacing(12)
+		icons_layout.setContentsMargins(5, 15, 5, 5)
 
-		layout.addSpacing(15)
-
-		section2 = QLabel("Системные настройки:")
-		section2.setStyleSheet("font-weight: bold; font-size: 10pt;")
-		layout.addWidget(section2)
-
-		self.autostart_checkbox = QCheckBox("Добавить программу в автозагрузку")
-		layout.addWidget(self.autostart_checkbox)
-		
-		layout.addSpacing(15)
-
-		section3 = QLabel("Персонализация:")
-		section3.setStyleSheet("font-weight: bold; font-size: 10pt;")
-		layout.addWidget(section3)
-
-		# Пустая корзина
 		empty_layout = QHBoxLayout()
-		empty_label = QLabel("Иконка пустой корзины:")
+		empty_label = QLabel("Пустая корзина:")
 		empty_layout.addWidget(empty_label)
 		empty_layout.addStretch()
-
 		self.choose_empty_button = QPushButton("Выбрать")
-		self.choose_empty_button.setMaximumWidth(120)
+		self.choose_empty_button.setMaximumWidth(80)
 		self.choose_empty_button.clicked.connect(lambda: self.choose_icon('empty'))
-		empty_layout.addWidget(self.choose_empty_button)
-
-		self.reset_empty_button = QPushButton("Сбросить")
-		self.reset_empty_button.setMaximumWidth(120)
+		self.reset_empty_button = QPushButton("Сброс")
+		self.reset_empty_button.setMaximumWidth(70)
 		self.reset_empty_button.clicked.connect(lambda: self.reset_icon('empty'))
+		empty_layout.addWidget(self.choose_empty_button)
 		empty_layout.addWidget(self.reset_empty_button)
+		icons_layout.addLayout(empty_layout)
 
-		layout.addLayout(empty_layout)
-
-		# Полная корзина
 		full_layout = QHBoxLayout()
-		full_label = QLabel("Иконка полной корзины:")
+		full_label = QLabel("Полная корзина:")
 		full_layout.addWidget(full_label)
 		full_layout.addStretch()
-
 		self.choose_full_button = QPushButton("Выбрать")
-		self.choose_full_button.setMaximumWidth(120)
+		self.choose_full_button.setMaximumWidth(80)
 		self.choose_full_button.clicked.connect(lambda: self.choose_icon('full'))
-		full_layout.addWidget(self.choose_full_button)
-
-		self.reset_full_button = QPushButton("Сбросить")
-		self.reset_full_button.setMaximumWidth(120)
+		self.reset_full_button = QPushButton("Сброс")
+		self.reset_full_button.setMaximumWidth(70)
 		self.reset_full_button.clicked.connect(lambda: self.reset_icon('full'))
+		full_layout.addWidget(self.choose_full_button)
 		full_layout.addWidget(self.reset_full_button)
-
-		layout.addLayout(full_layout)
-
-		layout.addSpacing(15)
-
-		save_button = QPushButton("Сохранить")
-		save_button.clicked.connect(self.save_settings)
-		layout.addWidget(save_button, alignment=Qt.AlignmentFlag.AlignCenter)
+		icons_layout.addLayout(full_layout)
 		
-		self.setLayout(layout)
+		icons_layout.addStretch()
+		self.tab_widget.addTab(tab_icons, "Иконки")
+
+		tab_clicks = QWidget()
+		clicks_layout = QVBoxLayout(tab_clicks)
+		clicks_layout.setSpacing(12)
+		clicks_layout.setContentsMargins(5, 15, 5, 5)
+
+		single_layout = QHBoxLayout()
+		single_label = QLabel("Один клик:")
+		single_layout.addWidget(single_label)
+		single_layout.addStretch()
+		self.single_click_combo = QComboBox()
+		single_layout.addWidget(self.single_click_combo)
+		clicks_layout.addLayout(single_layout)
+
+		double_layout = QHBoxLayout()
+		double_label = QLabel("Двойной клик:")
+		double_layout.addWidget(double_label)
+		double_layout.addStretch()
+		self.double_click_combo = QComboBox()
+		double_layout.addWidget(self.double_click_combo)
+		clicks_layout.addLayout(double_layout)
+		
+		clicks_layout.addStretch()
+		self.tab_widget.addTab(tab_clicks, "Взаимодействие")
+
+		self.single_click_combo.currentIndexChanged.connect(self.update_click_combos)
+		self.double_click_combo.currentIndexChanged.connect(self.update_click_combos)
+
+		main_layout.addWidget(self.tab_widget)
+
+		save_button = QPushButton("Сохранить настройки")
+		save_button.clicked.connect(self.save_settings)
+		main_layout.addWidget(save_button, alignment=Qt.AlignmentFlag.AlignCenter)
+		
+		self.setLayout(main_layout)
 
 	def load_settings(self):
 		self.notification_checkbox.setChecked(load_setting("show_notification", True))
 		self.confirmation_checkbox.setChecked(load_setting("show_confirmation", False))
 		self.autostart_checkbox.setChecked(is_autostart_enabled())
 
+		self.single_click_combo.blockSignals(True)
+		self.double_click_combo.blockSignals(True)
+
+		all_items = [
+			("Очистить корзину", "empty_bin"),
+			("Открыть корзину", "open_bin"),
+			("Открыть настройки", "open_settings"),
+			("Ничего не делать", "none")
+		]
+
+		for text, data in all_items:
+			self.single_click_combo.addItem(text, data)
+			self.double_click_combo.addItem(text, data)
+
+		single_action = load_string_setting("single_click_action", "empty_bin")
+		idx_single = self.single_click_combo.findData(single_action)
+		if idx_single != -1:
+			self.single_click_combo.setCurrentIndex(idx_single)
+
+		double_action = load_string_setting("double_click_action", "open_settings")
+		idx_double = self.double_click_combo.findData(double_action)
+		if idx_double != -1:
+			self.double_click_combo.setCurrentIndex(idx_double)
+
+		self.single_click_combo.blockSignals(False)
+		self.double_click_combo.blockSignals(False)
+
+		self.update_click_combos()
+
+	def update_click_combos(self):
+		self.single_click_combo.blockSignals(True)
+		self.double_click_combo.blockSignals(True)
+
+		current_single = self.single_click_combo.currentData()
+		current_double = self.double_click_combo.currentData()
+
+		all_items = [
+			("Очистить корзину", "empty_bin"),
+			("Открыть корзину", "open_bin"),
+			("Открыть настройки", "open_settings"),
+			("Ничего не делать", "none")
+		]
+
+		self.single_click_combo.clear()
+		for text, data in all_items:
+			if data == current_single or data != current_double or data == "none":
+				self.single_click_combo.addItem(text, data)
+
+		self.double_click_combo.clear()
+		for text, data in all_items:
+			if data == current_double or data != current_single or data == "none":
+				self.double_click_combo.addItem(text, data)
+
+		idx_single = self.single_click_combo.findData(current_single)
+		if idx_single != -1:
+			self.single_click_combo.setCurrentIndex(idx_single)
+
+		idx_double = self.double_click_combo.findData(current_double)
+		if idx_double != -1:
+			self.double_click_combo.setCurrentIndex(idx_double)
+
+		self.single_click_combo.blockSignals(False)
+		self.double_click_combo.blockSignals(False)
+
 	def save_settings(self):
 		save_setting("show_notification", self.notification_checkbox.isChecked())
 		save_setting("show_confirmation", self.confirmation_checkbox.isChecked())
 		set_autostart(self.autostart_checkbox.isChecked())
+
+		save_string_setting("single_click_action", self.single_click_combo.currentData())
+		save_string_setting("double_click_action", self.double_click_combo.currentData())
+
 		self.hide()
 
 	def showEvent(self, event):
@@ -238,7 +347,6 @@ class SettingsWindow(QDialog):
 		self.move(x, y)
 
 	def choose_icon(self, icon_type):
-		"""Открывает диалог выбора иконки"""
 		file_path, _ = QFileDialog.getOpenFileName(
 			self,
 			f"Выберите иконку для {'пустой' if icon_type == 'empty' else 'полной'} корзины",
@@ -247,7 +355,6 @@ class SettingsWindow(QDialog):
 		)
 		
 		if file_path:
-			# Сохраняем путь
 			save_icon_path(icon_type, file_path)
 			QMessageBox.information(
 				self,
@@ -257,8 +364,7 @@ class SettingsWindow(QDialog):
 			)
 
 	def reset_icon(self, icon_type):
-		"""Сбрасывает иконку на дефолтную"""
-		reset_icon(icon_type)
+		delete_icon_setting(icon_type)
 		QMessageBox.information(
 			self,
 			"Иконка сброшена",

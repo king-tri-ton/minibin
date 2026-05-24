@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 from PyQt6.QtGui import QIcon, QAction, QCursor
 from PyQt6.QtCore import QTimer, QPoint
 import winreg
-from settings import SettingsWindow, load_setting, load_icon_path
+from settings import SettingsWindow, load_setting, load_icon_path, load_string_setting
 
 class SHQUERYRBINFO(ctypes.Structure):
 	_fields_ = [
@@ -24,17 +24,16 @@ def resource_path(relative_path):
 	return os.path.join(base_path, relative_path)
 
 def load_icon(default_icon_path, icon_type=None):
-    """
-    Загружает иконку: сначала пытается загрузить кастомную, если нет - дефолтную
-    icon_type: 'empty' или 'full'
-    """
-    if icon_type:
-        custom_path = load_icon_path(icon_type)
-        if custom_path and os.path.exists(custom_path):
-            return QIcon(custom_path)
-    
-    # Если кастомной нет - загружаем дефолтную
-    return QIcon(resource_path(default_icon_path))
+	"""
+	Загружает иконку: сначала пытается загрузить кастомную, если нет - дефолтную
+	icon_type: 'empty' или 'full'
+	"""
+	if icon_type:
+		custom_path = load_icon_path(icon_type)
+		if custom_path and os.path.exists(custom_path):
+			return QIcon(custom_path)
+
+	return QIcon(resource_path(default_icon_path))
 
 def open_recycle_bin():
 	os.startfile("shell:RecycleBinFolder")
@@ -51,15 +50,14 @@ def exit_program():
 	QApplication.quit()
 
 def update_icon():
-    if is_recycle_bin_empty():
-        tray_icon.setIcon(load_icon("icons/minibin-kt-empty.ico", "empty"))
-    else:
-        tray_icon.setIcon(load_icon("icons/minibin-kt-full.ico", "full"))
-    
-    # Эти две строки должны быть на уровне функции, не внутри if/else
-    if not tray_icon.isVisible():
-        tray_icon.hide()
-        tray_icon.show()
+	if is_recycle_bin_empty():
+		tray_icon.setIcon(load_icon("icons/minibin-kt-empty.ico", "empty"))
+	else:
+		tray_icon.setIcon(load_icon("icons/minibin-kt-full.ico", "full"))
+
+	if not tray_icon.isVisible():
+		tray_icon.hide()
+		tray_icon.show()
 
 def is_recycle_bin_empty():
 	rbinfo = SHQUERYRBINFO()
@@ -108,13 +106,39 @@ if __name__ == "__main__":
 	tray_menu.addSeparator()
 	tray_menu.addAction(exit_action)
 
-	def show_tray_menu(reason):
+	click_timer = QTimer()
+	click_timer.setSingleShot(True)
+
+	actions_map = {
+		"empty_bin": empty_recycle_bin,
+		"open_bin": open_recycle_bin,
+		"open_settings": open_settings,
+		"none": lambda: None
+	}
+
+	def perform_single_click():
+		action_key = load_string_setting("single_click_action", "empty_bin")
+		if action_key in actions_map:
+			actions_map[action_key]()
+
+	click_timer.timeout.connect(perform_single_click)
+
+	def handle_tray_activation(reason):
 		if reason == QSystemTrayIcon.ActivationReason.Context:
 			icon_geometry = tray_icon.geometry()
 			menu_height = tray_menu.sizeHint().height()
 			tray_menu.popup(QPoint(icon_geometry.x(), icon_geometry.y() - menu_height))
+			
+		elif reason == QSystemTrayIcon.ActivationReason.Trigger:
+			click_timer.start(250)
+			
+		elif reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+			click_timer.stop()
+			action_key = load_string_setting("double_click_action", "open_settings")
+			if action_key in actions_map:
+				actions_map[action_key]()
 
-	tray_icon.activated.connect(show_tray_menu)
+	tray_icon.activated.connect(handle_tray_activation)
 	tray_icon.show()
 
 	update_timer = QTimer()
