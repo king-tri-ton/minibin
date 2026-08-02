@@ -6,6 +6,9 @@ on:
     paths:
       - 'app.py'
       - 'settings.py'
+      - 'theme_icons.py'
+      - 'tests/**'
+      - 'tools/generate_theme_icons.py'
       - 'requirements.txt'
       - 'icons/**'
       - '.github/workflows/build_and_scan.yml'
@@ -15,6 +18,9 @@ on:
     paths:
       - 'app.py'
       - 'settings.py'
+      - 'theme_icons.py'
+      - 'tests/**'
+      - 'tools/generate_theme_icons.py'
       - 'requirements.txt'
       - 'icons/**'
       - '.github/workflows/build_and_scan.yml'
@@ -36,9 +42,12 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
     
+    - name: Run tests
+      run: python -m unittest discover -s tests
+
     - name: Build EXE
       run: |
-        python -m PyInstaller --clean --noupx --onefile --noconsole --icon=icons/minibin-kt-full.ico --add-data "icons;icons" --name="MiniBin-KT" app.py
+        python -m PyInstaller --clean --noupx --onefile --noconsole --icon=icons/minibin-kt-light-full.ico --add-data "icons;icons" --name="MiniBin-KT" app.py
       env:
         PYTHONIOENCODING: utf-8
     
