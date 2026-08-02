@@ -1,5 +1,7 @@
 /build/
+/build-*/
 /output/
+/release-*/
 *.pyc
 *.pyo
 *.pyd
@@ -8,6 +10,7 @@ __pycache__/
 *.db
 /venv/
 /.venv/
+/.venv310/
 .pytest_cache/
 /myenv/
 /custom_icons/
