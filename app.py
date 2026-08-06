@@ -3,11 +3,12 @@ import sys
 import os
 import threading
 import time
+import winreg
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 from PyQt6.QtGui import QIcon, QAction, QCursor
 from PyQt6.QtCore import QTimer, QPoint
-import winreg
 from settings import SettingsWindow, load_setting, load_icon_path, load_string_setting
+
 
 class SHQUERYRBINFO(ctypes.Structure):
 	_fields_ = [
@@ -16,12 +17,14 @@ class SHQUERYRBINFO(ctypes.Structure):
 		("i64NumItems", ctypes.c_int64)
 	]
 
+
 def resource_path(relative_path):
 	try:
 		base_path = sys._MEIPASS
 	except AttributeError:
 		base_path = os.path.abspath(".")
 	return os.path.join(base_path, relative_path)
+
 
 def load_icon(default_icon_path, icon_type=None):
 	"""
@@ -35,8 +38,10 @@ def load_icon(default_icon_path, icon_type=None):
 
 	return QIcon(resource_path(default_icon_path))
 
+
 def open_recycle_bin():
 	os.startfile("shell:RecycleBinFolder")
+
 
 def open_settings():
 	global settings_window
@@ -46,11 +51,15 @@ def open_settings():
 	settings_window.raise_()
 	settings_window.activateWindow()
 
+
 def exit_program():
 	QApplication.quit()
 
+
 def update_icon():
-	if is_recycle_bin_empty():
+	size_bytes, num_items = get_recycle_bin_info()
+	is_empty = (num_items == 0)
+	if is_empty:
 		tray_icon.setIcon(load_icon("icons/minibin-kt-empty.ico", "empty"))
 	else:
 		tray_icon.setIcon(load_icon("icons/minibin-kt-full.ico", "full"))
@@ -59,13 +68,35 @@ def update_icon():
 		tray_icon.hide()
 		tray_icon.show()
 
-def is_recycle_bin_empty():
+	if load_setting("show_size_hover", True):
+		if is_empty:
+			tray_icon.setToolTip("Корзина (Пусто)")
+		else:
+			tray_icon.setToolTip(f"Корзина\nРазмер: {format_size(size_bytes)}\nФайлов: {num_items}")
+	else:
+		tray_icon.setToolTip("Корзина")
+
+
+def format_size(size_bytes):
+	if size_bytes == 0:
+		return "0 B"
+	units = ["B", "KB", "MB", "GB", "TB"]
+	i = 0
+	size = float(size_bytes)
+	while size >= 1024.0 and i < len(units) - 1:
+		size /= 1024.0
+		i += 1
+	return f"{size:.2f} {units[i]}"
+
+
+def get_recycle_bin_info():
 	rbinfo = SHQUERYRBINFO()
 	rbinfo.cbSize = ctypes.sizeof(SHQUERYRBINFO)
 	result = ctypes.windll.shell32.SHQueryRecycleBinW(None, ctypes.byref(rbinfo))
 	if result != 0:
-		return False
-	return rbinfo.i64NumItems == 0
+		return 0, 0
+	return rbinfo.i64Size, rbinfo.i64NumItems
+
 
 def empty_recycle_bin():
 	SHEmptyRecycleBin = ctypes.windll.shell32.SHEmptyRecycleBinW
@@ -115,7 +146,8 @@ if __name__ == "__main__":
 		"open_settings": open_settings,
 		"none": lambda: None
 	}
-
+	
+	
 	def perform_single_click():
 		action_key = load_string_setting("single_click_action", "empty_bin")
 		if action_key in actions_map:
@@ -123,6 +155,7 @@ if __name__ == "__main__":
 
 	click_timer.timeout.connect(perform_single_click)
 
+	
 	def handle_tray_activation(reason):
 		if reason == QSystemTrayIcon.ActivationReason.Context:
 			icon_geometry = tray_icon.geometry()
