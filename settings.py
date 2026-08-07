@@ -1,16 +1,18 @@
 import winreg
 import sys
 import os
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QCheckBox, QPushButton, 
                              QLabel, QMessageBox, QApplication, QFileDialog, 
                              QHBoxLayout, QComboBox, QTabWidget, QWidget)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon
+
 
 def save_setting(name, value):
 	key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\MiniBinKT")
 	winreg.SetValueEx(key, name, 0, winreg.REG_DWORD, int(value))
 	winreg.CloseKey(key)
+
 
 def load_setting(name, default=True):
 	try:
@@ -21,10 +23,12 @@ def load_setting(name, default=True):
 	except (FileNotFoundError, WindowsError):
 		return default
 
+
 def save_string_setting(name, value):
 	key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\MiniBinKT")
 	winreg.SetValueEx(key, name, 0, winreg.REG_SZ, str(value))
 	winreg.CloseKey(key)
+
 
 def load_string_setting(name, default="none"):
 	try:
@@ -35,6 +39,7 @@ def load_string_setting(name, default="none"):
 	except (FileNotFoundError, WindowsError):
 		return default
 
+
 def is_autostart_enabled():
 	try:
 		key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run")
@@ -43,6 +48,7 @@ def is_autostart_enabled():
 		return True
 	except (FileNotFoundError, WindowsError):
 		return False
+
 
 def set_autostart(enabled):
 	key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
@@ -56,6 +62,7 @@ def set_autostart(enabled):
 			pass
 	winreg.CloseKey(key)
 
+
 def resource_path(relative_path):
 	try:
 		base_path = sys._MEIPASS
@@ -63,10 +70,12 @@ def resource_path(relative_path):
 		base_path = os.path.abspath(".")
 	return os.path.join(base_path, relative_path)
 
+
 def save_icon_path(icon_type, path):
 	key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\MiniBinKT")
 	winreg.SetValueEx(key, f"custom_icon_{icon_type}", 0, winreg.REG_SZ, path)
 	winreg.CloseKey(key)
+
 
 def load_icon_path(icon_type):
 	try:
@@ -76,6 +85,7 @@ def load_icon_path(icon_type):
 		return value
 	except (FileNotFoundError, WindowsError):
 		return None
+
 
 def delete_icon_setting(icon_type):
 	try:
@@ -90,7 +100,7 @@ class SettingsWindow(QDialog):
 	def __init__(self, parent=None):
 		super().__init__(parent)
 		self.setWindowTitle("Настройки MiniBinKT")
-		self.setFixedSize(380, 200)
+		self.setFixedSize(380, 230)
 		self.setWindowFlags(Qt.WindowType.WindowCloseButtonHint | Qt.WindowType.WindowTitleHint)
 		self.setWindowIcon(QIcon(resource_path("icons/minibin-settings.ico")))
 
@@ -165,6 +175,7 @@ class SettingsWindow(QDialog):
 		self.init_ui()
 		self.load_settings()
 
+
 	def init_ui(self):
 		main_layout = QVBoxLayout()
 		main_layout.setSpacing(10)
@@ -180,10 +191,12 @@ class SettingsWindow(QDialog):
 		self.notification_checkbox = QCheckBox("Уведомления при очистке корзины")
 		self.confirmation_checkbox = QCheckBox("Предупреждение перед очисткой")
 		self.autostart_checkbox = QCheckBox("Запускать при старте Windows")
+		self.hover_size_checkbox = QCheckBox("Показывать размер при наведении")
 
 		gen_layout.addWidget(self.notification_checkbox)
 		gen_layout.addWidget(self.confirmation_checkbox)
 		gen_layout.addWidget(self.autostart_checkbox)
+		gen_layout.addWidget(self.hover_size_checkbox)
 		gen_layout.addStretch()
 		self.tab_widget.addTab(tab_general, "Основные")
 
@@ -258,10 +271,12 @@ class SettingsWindow(QDialog):
 		
 		self.setLayout(main_layout)
 
+
 	def load_settings(self):
 		self.notification_checkbox.setChecked(load_setting("show_notification", True))
 		self.confirmation_checkbox.setChecked(load_setting("show_confirmation", False))
 		self.autostart_checkbox.setChecked(is_autostart_enabled())
+		self.hover_size_checkbox.setChecked(load_setting("show_size_hover", True))
 
 		self.single_click_combo.blockSignals(True)
 		self.double_click_combo.blockSignals(True)
@@ -291,6 +306,7 @@ class SettingsWindow(QDialog):
 		self.double_click_combo.blockSignals(False)
 
 		self.update_click_combos()
+
 
 	def update_click_combos(self):
 		self.single_click_combo.blockSignals(True)
@@ -327,15 +343,18 @@ class SettingsWindow(QDialog):
 		self.single_click_combo.blockSignals(False)
 		self.double_click_combo.blockSignals(False)
 
+
 	def save_settings(self):
 		save_setting("show_notification", self.notification_checkbox.isChecked())
 		save_setting("show_confirmation", self.confirmation_checkbox.isChecked())
 		set_autostart(self.autostart_checkbox.isChecked())
+		save_setting("show_size_hover", self.hover_size_checkbox.isChecked())
 
 		save_string_setting("single_click_action", self.single_click_combo.currentData())
 		save_string_setting("double_click_action", self.double_click_combo.currentData())
 
 		self.hide()
+
 
 	def showEvent(self, event):
 		super().showEvent(event)
@@ -345,6 +364,7 @@ class SettingsWindow(QDialog):
 		x = screen.width() - window_size.width() - margin
 		y = screen.height() - window_size.height() - margin
 		self.move(x, y)
+
 
 	def choose_icon(self, icon_type):
 		file_path, _ = QFileDialog.getOpenFileName(
@@ -363,6 +383,7 @@ class SettingsWindow(QDialog):
 				QMessageBox.StandardButton.Ok
 			)
 
+
 	def reset_icon(self, icon_type):
 		delete_icon_setting(icon_type)
 		QMessageBox.information(
@@ -371,6 +392,7 @@ class SettingsWindow(QDialog):
 			"Иконка будет восстановлена после перезапуска программы.",
 			QMessageBox.StandardButton.Ok
 		)
+
 
 	def closeEvent(self, event):
 		event.ignore()
